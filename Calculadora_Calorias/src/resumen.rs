@@ -57,18 +57,41 @@ pub fn show(
     runtime: &tokio::runtime::Runtime
 ) {
     if !hay_cuenta.is_empty(){
-        let datos = runtime.block_on(get_tmb(jwt_token.as_deref().unwrap_or("")));
-        match datos{
-            Ok(valor) => {
-                if !valor.is_empty(){
-                    *tmb = valor.parse().unwrap();
-                }else{
-                    *tmb = -1.0;
-                }
-                
+        // Antes esto se ejecutaba SIN CONDICIÓN en cada frame (egui repinta
+        // muchas veces por segundo), bloqueando la UI y bombardeando la API
+        // con una petición HTTP por frame. Ahora solo se refresca como mucho
+        // una vez cada REFRESCO_SEGUNDOS, guardando el último instante en la
+        // memoria de egui (persiste entre frames sin tocar el resto de la app).
+        const REFRESCO_SEGUNDOS: f32 = 5.0;
+        let id = egui::Id::new("resumen_tmb_ultimo_refresco");
+        let ahora = std::time::Instant::now();
+
+        let debe_refrescar = ui.ctx().data_mut(|d| {
+            let ultimo = d.get_temp_mut_or_insert_with::<Option<std::time::Instant>>(id, || None);
+            let toca = match *ultimo {
+                None => true,
+                Some(t) => ahora.duration_since(t).as_secs_f32() >= REFRESCO_SEGUNDOS,
+            };
+            if toca {
+                *ultimo = Some(ahora);
             }
-            Err(e) => {
-                println!("Error {}", e);
+            toca
+        });
+
+        if debe_refrescar {
+            let datos = runtime.block_on(get_tmb(jwt_token.as_deref().unwrap_or("")));
+            match datos{
+                Ok(valor) => {
+                    if !valor.is_empty(){
+                        *tmb = valor.parse().unwrap();
+                    }else{
+                        *tmb = -1.0;
+                    }
+                    
+                }
+                Err(e) => {
+                    println!("Error {}", e);
+                }
             }
         }
     }
@@ -382,8 +405,9 @@ pub async fn get_tmb(
 
     if !respuesta.status().is_success(){
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        println!("Error backend en get_tmb: {} - {}", status, body);
+        return Ok(String::new());
     }
 
     let tmb:String = respuesta.json().await?;
