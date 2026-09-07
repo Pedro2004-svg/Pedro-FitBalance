@@ -139,7 +139,6 @@ async fn create_user(
     contrasena_confirm: String
 ) -> Result<RegisterResponse, reqwest::Error> {
     let client = reqwest::Client::new();
-    println!("Entra en el create_user");
     let respuesta = client
         .post("http://127.0.0.1:30000/register")
         .json(&RegisterRequest {
@@ -150,7 +149,6 @@ async fn create_user(
         })
         .send()
         .await?;
-    println!("Hace la llamada a la API");
     if !respuesta.status().is_success() {
         let status = respuesta.status();
         let body = respuesta.text().await?;

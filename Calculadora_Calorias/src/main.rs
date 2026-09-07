@@ -279,7 +279,6 @@ impl eframe::App for CalculadoraCalorias {
                 }
 
                 Pantalla::Semanal => {
-                    println!("Tmb Semanal: {}", self.tmb);
                     semanales::show(
                         ui, 
                         &mut self.alimentos,

@@ -12,7 +12,9 @@ struct TMBRequest {
 
 #[derive(Deserialize)]
 struct TMBResponse {
-    calorias: String,
+    tmb: String,
+    #[allow(dead_code)]
+    nombre_usuario: String,
 }
 
 struct Palette;
@@ -200,7 +202,17 @@ pub fn show(
 
                     if ui.add(btn).clicked() {
                         match calcular_tmb(*altura, peso, edad, sexo) {
-                            Ok(valor) => *result = valor.to_string(),
+                            Ok(valor) => {
+                                *result = valor.to_string();
+                                // Marca que este resultado concreto aún no se
+                                // ha enviado al backend. Se consume una sola
+                                // vez más abajo, en vez de reenviarse en cada
+                                // frame mientras la card de resultado esté
+                                // visible.
+                                ui.ctx().data_mut(|d| {
+                                    d.insert_temp(egui::Id::new("index_tmb_pendiente_registro"), true)
+                                });
+                            }
                             Err(e) => *result = format!("error:{}", e),
                         }
                     }
@@ -302,14 +314,29 @@ pub fn show(
                         });
 
                     ui.add_space(14.0);
-                    if !_hay_cuenta.is_empty() {
+                    // Antes esto llamaba a tmb_register en CADA FRAME mientras
+                    // la card de resultado estuviera visible (bloqueando la UI
+                    // y machacando la API constantemente). Ahora solo se envía
+                    // una vez, justo tras pulsar "Calcular TMB", consumiendo el
+                    // flag que se marcó en el on-click del botón.
+                    let debe_registrar = ui.ctx().data_mut(|d| {
+                        let pendiente = d.get_temp_mut_or_insert_with::<bool>(
+                            egui::Id::new("index_tmb_pendiente_registro"),
+                            || false,
+                        );
+                        let estaba_pendiente = *pendiente;
+                        *pendiente = false;
+                        estaba_pendiente
+                    });
+
+                    if !_hay_cuenta.is_empty() && debe_registrar {
                         let resultado =
                             runtime.block_on(tmb_register(_hay_cuenta.clone(), result.clone(), jwt_token.as_deref().unwrap_or(""),));
-
+                    /* 
                         match resultado {
                             Ok(_) => println!("TMB registrado"),
                             Err(e) => println!("Error, {}", e),
-                        }
+                        } */
                     }
                 });
             }
@@ -358,33 +385,29 @@ fn calcular_tmb(
         "Female" => (10.0 * peso) + (6.25 * altura) - (5.0 * edad) - 161.0,
         _ => return Err("Selecciona un sexo".into()),
     };
-    println!("Entro en calcular_tmb");
     Ok(resultado.ceil() as u64)
 }
 
-async fn tmb_register(usuario: String, calorias: String,token: &str) -> Result<String, reqwest::Error> {
-    println!("Entro en tmb_register");
+async fn tmb_register(usuario: String, calorias: String, token: &str) -> Result<String, String> {
     let client = reqwest::Client::new();
-    println!(
-        "Le llego de usuario: {} y de calorias {}",
-        usuario, calorias
-    );
     let respuesta = client
         .post("http://127.0.0.1:30000/tmb_register")
         .header("Authorization", format!("Bearer {}", token))
         .json(&TMBRequest { usuario, calorias })
         .send()
-        .await?;
-    println!("Paso la conexion a la api");
-    if !respuesta.status().is_success() {
-        let status = respuesta.status();
-        let body = respuesta.text().await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
-        panic!("Error backend: {} - {}", status, body);
+    if !respuesta.status().is_success() {
+        // Antes esto hacía panic!() y cerraba toda la app de escritorio si la
+        // API respondía con cualquier error. Ahora se propaga como un Err
+        // normal para que el caller decida qué hacer (por ahora solo lo
+        // imprime, pero al menos no tumba la aplicación).
+        let status = respuesta.status();
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
 
-    let datos: TMBResponse = respuesta.json().await?;
-    Ok(datos.calorias)
+    let datos: TMBResponse = respuesta.json().await.map_err(|e| e.to_string())?;
+    Ok(datos.tmb)
 }
-
-

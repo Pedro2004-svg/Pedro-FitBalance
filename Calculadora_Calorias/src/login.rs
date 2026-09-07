@@ -91,7 +91,6 @@ pub fn show(
             ));
             match resultado {
                 Ok(datos) => {
-                    println!("El correo es: {}", datos.correo);
                     *mensaje_completo = Some((datos.mensaje, datos.success, datos.cuenta, datos.correo));
                 }
                 Err(err) => {

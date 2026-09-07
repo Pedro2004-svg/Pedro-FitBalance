@@ -32,23 +32,39 @@ pub fn show(
         return; 
     }
 
-    println!("Tmb dentro de Semanal: {}", tmb);
     let fecha_hoy = Local::now().date_naive();
     let dia_semana = fecha_hoy.weekday().num_days_from_monday();
     let lunes = fecha_hoy - Duration::days(dia_semana as i64);
     let fechas_semana: Vec<NaiveDate> = (0..7).map(|i| lunes + Duration::days(i)).collect();
-    let datos = runtime.block_on(get_tmb(jwt_token.as_deref().unwrap_or("")));
-    match datos{
-        Ok(valor) => {
-            if !valor.is_empty(){
-                tmb = valor.parse().unwrap();
-            }else{
-                tmb = -1.0;
-            }
-            
+    let id = egui::Id::new("resumen_tmb_ultimo_refresco");
+    let ahora = std::time::Instant::now();
+    const REFRESCO_SEGUNDOS: f32 = 5.0;
+    let debe_refrescar = ui.ctx().data_mut(|d| {
+        let ultimo = d.get_temp_mut_or_insert_with::<Option<std::time::Instant>>(id, || None);
+        let toca = match *ultimo {
+            None => true,
+            Some(t) => ahora.duration_since(t).as_secs_f32() >= REFRESCO_SEGUNDOS,
+        };
+        if toca {
+            *ultimo = Some(ahora);
         }
-        Err(e) => {
-            println!("Error {}", e);
+        toca
+    });
+
+    if debe_refrescar {
+        let datos = runtime.block_on(get_tmb(jwt_token.as_deref().unwrap_or("")));
+        match datos{
+            Ok(valor) => {
+                if !valor.is_empty(){
+                    tmb = valor.parse().unwrap();
+                }else{
+                    tmb = -1.0;
+                }
+                
+            }
+            Err(e) => {
+                println!("Error {}", e);
+            }
         }
     }
     egui::ScrollArea::vertical().show(ui, |ui|{ 

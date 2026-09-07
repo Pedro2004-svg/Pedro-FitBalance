@@ -296,7 +296,6 @@ pub fn show(
                                         .min_size(Vec2::new(20.0, 20.0));
 
                                         if ui.add(edit_btn).clicked(){
-                                            println!("{}", i);
                                             editado.editar = true;
                                             editado.nombre_modificado = alimento.alimento.nombre.clone();
                                             editado.calorias_modificado = alimento.alimento.calorias.to_string();
@@ -305,7 +304,6 @@ pub fn show(
 
                                         if ui.add(del_btn).clicked() {
                                             if !hay_cuenta.is_empty(){
-                                                println!("{}", alimento.id);
                                                 let _foods = runtime.block_on(
                                             delete_food(alimento.id, jwt_token.as_deref().unwrap_or(""))
                                                 );
@@ -381,7 +379,6 @@ let alimento = Alimento {
     usuario,
     fecha
 };
-println!("{}", serde_json::to_string(&alimento).unwrap());
     let client = reqwest::Client::new();
     let respuesta = client
         .post("http://127.0.0.1:30000/alimento_register")
