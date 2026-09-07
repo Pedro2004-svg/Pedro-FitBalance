@@ -36,7 +36,6 @@ pub async fn conexion_alimentos(pool: &PgPool) -> Result<Vec<FoodItem>, Box<dyn 
     for food in &foods {
         let kcal = obtener_calorias(food);
         if let Some(calorias) = kcal {
-            println!("{} -> {:?} kcal", &food.description, &calorias);
             register_food(pool, food.description.clone(), calorias.clone()).await?;
         }
     }

@@ -20,8 +20,9 @@ pub struct AppState {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let database_url = env::var("DATABASE_URL")?;
-    let jwt_secret =
-        env::var("JWT_SECRET").unwrap_or_else(|_| "secret-key-por-defecto".to_string());
+    // VarError implementa std::error::Error, así que si falta la variable
+    // el servidor no arranca (mejor eso que usar un secreto por defecto).
+    let jwt_secret = env::var("JWT_SECRET")?;
 
     let pool = db::connect(&database_url).await?;
     

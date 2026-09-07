@@ -21,11 +21,9 @@ pub async fn create_user(
     .await?;
 
     if usuario_existente.is_some() {
-        println!("Entro usuario");
         return Ok(CrearUsuarioResult::UsuarioYaExiste);
     }
 
-    println!("Llego a esta parte");
     let correo_existente: Option<sqlx::postgres::PgRow> = sqlx::query(
         r#"
         SELECT correo FROM usuarios_registrados WHERE correo = ($1)
@@ -35,11 +33,9 @@ pub async fn create_user(
     .fetch_optional(pool)
     .await?;
     if correo_existente.is_some() {
-        println!("Entro correo");
         return Ok(CrearUsuarioResult::CorreoYaExiste);
     }
 
-    println!("Llego a la 2º parte");
     sqlx::query(
         r#"
         INSERT INTO usuarios_registrados (nombre_usuario, contraseña, correo)
@@ -78,7 +74,6 @@ pub async fn start_sesion(
 }
 
 pub async fn tmb_register(pool: &PgPool, payload: &TMBRequest) -> Result<bool, sqlx::Error> {
-    println!("Entro al registro del TMB");
     let registro = sqlx::query(
         r#"
                     UPDATE usuarios_registrados SET tmb = ($1) WHERE nombre_usuario = ($2)
@@ -110,7 +105,6 @@ pub async fn register_food(
     .await?;
 
     if !buscador.is_empty() {
-        println!("Se ha encontrado");
         return Ok(());
     }
 
@@ -132,7 +126,6 @@ pub async fn register_alimento(
     pool: &PgPool,
     payload: &Alimento
 )-> Result<bool, sqlx::Error>{
-    println!("entro {},{}", payload.calorias, payload.nombre);
     let fecha = NaiveDate::parse_from_str(
         &payload.fecha[..10],
         "%Y-%m-%d"
@@ -178,19 +171,23 @@ Ok(alimentos)
 
 pub async fn delete_alimento(
     pool: &PgPool,
-    payload: i64,
+    id_alimento: i64,
+    usuario: String,
 ) -> Result<bool, sqlx::Error>{
-    println!("Llego al repo en el delete");
-    let _delete = sqlx::query(
+    // Solo se borra si el alimento pertenece al usuario autenticado.
+    let resultado = sqlx::query(
     r#"
-            DELETE FROM alimentos_usuario WHERE id = $1
+            DELETE FROM alimentos_usuario
+            WHERE id = $1
+            AND id_usuario = (SELECT id FROM usuarios_registrados WHERE nombre_usuario = $2)
         "#
     )
-    .bind(payload)
+    .bind(id_alimento)
+    .bind(usuario)
     .execute(pool)
-    .await;
+    .await?;
 
-    Ok(true)
+    Ok(resultado.rows_affected() > 0)
 }
 
 pub async fn get_tmb(
@@ -221,17 +218,21 @@ pub async fn get_tmb(
 pub async fn upt_alim(
     pool: &PgPool,
     payload: &AlimentoBBDD,
+    usuario: String
 ) -> Result<bool, sqlx::Error> {
 
     if !payload.nombre.is_empty(){
         sqlx::query(
         r#"
-                UPDATE alimentos_usuario SET nombre = ($1) WHERE id = ($2)
+                UPDATE alimentos_usuario SET nombre = ($1)
+                WHERE id = ($2)
+                AND id_usuario = (SELECT id FROM usuarios_registrados WHERE nombre_usuario = $3)
             "#,
         )
         .bind(&payload.nombre)
         .bind(&payload.id)
-        .fetch_optional(pool)
+        .bind(&usuario)
+        .execute(pool)
         .await?;
     } 
     
@@ -239,12 +240,15 @@ pub async fn upt_alim(
         let calorias = payload.calorias;
         sqlx::query(
         r#"
-                UPDATE alimentos_usuario SET calorias = ($1) WHERE id = ($2)
+                UPDATE alimentos_usuario SET calorias = ($1)
+                WHERE id = ($2)
+                AND id_usuario = (SELECT id FROM usuarios_registrados WHERE nombre_usuario = $3)
             "#,
         )
         .bind(&calorias)
         .bind(&payload.id)
-        .fetch_optional(pool)
+        .bind(&usuario)
+        .execute(pool)
         .await?;
     }
 
@@ -323,7 +327,6 @@ pub async fn upt_pass(
     usuario: String
 ) -> Result<String, sqlx::Error>{
     if !contrasena.is_empty(){
-        println!("Entre en el Update, {}, con el usuario, {}", contrasena, usuario);
         sqlx::query(
             r#"
                 UPDATE usuarios_registrados SET contraseña = ($1) WHERE nombre_usuario = ($2)
@@ -388,6 +391,20 @@ pub async fn guardar_codigo_verificacion(
     .await?;
 
     Ok(())
+}
+
+pub async fn get_usuario_por_correo(
+    pool: &PgPool,
+    correo: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    let nombre_usuario: Option<String> = sqlx::query_scalar!(
+        "SELECT nombre_usuario FROM usuarios_registrados WHERE correo = $1",
+        correo
+    )
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(nombre_usuario)
 }
 
 pub async fn verificar_codigo(

@@ -1,5 +1,5 @@
 use crate::middleware::service::{login_user, register_user};
-use crate::repository::{del_user, delete_alimento, get_alimento, get_tmb, register_alimento, tmb_register, upt_alim, upt_email, upt_pass, upt_user,guardar_codigo_verificacion, verificar_codigo};
+use crate::repository::{del_user, delete_alimento, get_alimento, get_tmb, get_usuario_por_correo, register_alimento, tmb_register, upt_alim, upt_email, upt_pass, upt_user,guardar_codigo_verificacion, verificar_codigo};
 use axum::{Json, extract::State};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -141,15 +141,6 @@ pub async fn login(
                 }
             }
         });
-        println!("Correo en el login:{}", correo_cuenta);
-        /* let token = create_token(&payload.usuario, &state.jwt_secret)?;
-        Ok(Json(LoginResponse {
-            mensaje: "Login correcto".to_string(),
-            success: true,
-            cuenta: payload.usuario.clone(),
-            correo: correo_cuenta.clone(),
-            token: Some(token),
-        })) */
         Ok(Json(LoginResponse {
             mensaje: "Código de verificación enviado a tu email".to_string(),
             success: true,
@@ -185,7 +176,6 @@ pub async fn register(
         }))
     } else {
         let cuenta = payload.usuario.clone();
-        println!("Las contraseñas en el controller son: {} y {}", payload.contrasena, payload.contrasena_confirm );
         let token = create_token(&payload.usuario, &state.jwt_secret)?;
         let registro = register_user(&state.pool, payload).await?;
         match registro {
@@ -226,10 +216,13 @@ pub async fn register(
 }
 
 pub async fn tmb(
-    State(state): State<AppState>,         
-    Json(payload): Json<TMBRequest>,
+    State(state): State<AppState>,
+    claims: Claims,
+    Json(mut payload): Json<TMBRequest>,
 ) -> Result<Json<TMBResponse>, StatusCode> {
-    println!("Entro en el tmb desde el controller");
+    // Ignoramos el usuario que venga en el body: el dueño del recurso es
+    // siempre el usuario autenticado por el JWT, nunca un dato del cliente.
+    payload.usuario = claims.sub;
     let tmb_registrado: Result<bool, StatusCode> =
         tmb_register(&state.pool, &payload).await.map_err(|e| {
             println!("ERROR SQLX: {:?}", e);
@@ -249,10 +242,11 @@ pub async fn tmb(
 }
 
 pub async fn alimento_register(
-    State(state): State<AppState>,         
-    Json(payload): Json<Alimento>
+    State(state): State<AppState>,
+    claims: Claims,
+    Json(mut payload): Json<Alimento>
 ) -> Result<Json<AlimentoResponse>, StatusCode> {
-    println!("Entro al register de los alimentos {},{}", payload.calorias, payload.nombre);
+    payload.usuario = claims.sub;
     let _alimento_registrado: Result<bool, StatusCode> = register_alimento(&state.pool, &payload).await.map_err(|e| {
         println!("ERROR SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
@@ -265,30 +259,30 @@ pub async fn get_alimentos(
     State(state): State<AppState>,
     claims: Claims
 ) -> Result<Json<Vec<AlimentoBBDD>>, StatusCode>{
-    println!("Entro al get de los alimentos");
     let alimento: Vec<AlimentoBBDD> = get_alimento(&state.pool, claims.sub).await.map_err(|e|{
-        println!("ERROR SQLX2: {:?}", e);
+        println!("ERROR SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-
-    for alimentos in &alimento {
-        println!("El alimento {} tiene el id {}", alimentos.nombre, alimentos.id);
-    }
     Ok(Json(alimento))
 }
 
 pub async fn delete_food(
     State(state): State<AppState>,
+    claims: Claims,
     payload: String
 ) -> Result<String, StatusCode>{
-    println!("LLego al controller al eliminar un alimento");
-    let payload: i64 = payload.parse().unwrap();
-    let _delete_alimento: Result<bool, StatusCode> = delete_alimento(&state.pool, payload).await.map_err(|e|{
+    let id_alimento: i64 = payload.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let borrado = delete_alimento(&state.pool, id_alimento, claims.sub).await.map_err(|e|{
         println!("ERROR SQLX: {:?}",e);
         StatusCode::INTERNAL_SERVER_ERROR
-    });
+    })?;
 
-    Ok("Alimento eliminado correctamente".to_string())
+    if borrado {
+        Ok("Alimento eliminado correctamente".to_string())
+    } else {
+        Err(StatusCode::NOT_FOUND)
+    }
 }
 
 pub async fn obtener_tmb(
@@ -312,6 +306,7 @@ pub async fn obtener_tmb(
 
 pub async fn upt_food(
     State(state): State<AppState>,
+    claims: Claims,
     Json(payload): Json<Alimentoupt>
 )-> Result<String, StatusCode>{
     let alimentos:AlimentoBBDD = AlimentoBBDD{
@@ -321,10 +316,10 @@ pub async fn upt_food(
         created_at: Local::now(),
     };
     
-    let _upt_food: Result<bool, StatusCode> = upt_alim(&state.pool, &alimentos).await.map_err(|e|{
+    upt_alim(&state.pool, &alimentos, claims.sub).await.map_err(|e|{
         println!("ERROR SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
-    });
+    })?;
 
     Ok("Alimento actualizado correctamente".to_string())
 }
@@ -343,7 +338,7 @@ pub async fn upt_usuario(
     }
 
     let upt_user: Result<String, StatusCode> = upt_user(&state.pool, &payload.usuario, claims.sub).await.map_err(|e|{
-        println!("Error SQLX5: {:?}", e);
+        println!("Error SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     });
 
@@ -385,7 +380,7 @@ pub async fn upt_correo(
     }
 
     let upt_email: Result<String, StatusCode> = upt_email(&state.pool, &payload.correo, claims.sub).await.map_err(|e|{
-        println!("Error SQLX5: {:?}", e);
+        println!("Error SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     });
 
@@ -430,7 +425,7 @@ pub async fn upt_passw(
         })?;
 
     let upt_pass: Result<String, StatusCode> = upt_pass(&state.pool, &payload.contrasena_new, claims.sub).await.map_err(|e|{
-        println!("Error SQLX5: {:?}", e);
+        println!("Error SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     });
 
@@ -467,7 +462,7 @@ pub async fn del_usuario(
     }
 
     let delete_user = del_user(&state.pool, claims.sub).await.map_err(|e|{
-        println!("Error SQLX6: {:?}", e);
+        println!("Error SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     });
 
@@ -495,13 +490,20 @@ pub async fn verify_handler(
         return Err((StatusCode::UNAUTHORIZED, "Código incorrecto o expirado".to_string()));
     }
 
+    // El token se emite para el usuario dueño real del email verificado,
+    // nunca para el "usuario" que venga en el body (evita suplantación).
+    let usuario_real = get_usuario_por_correo(&state.pool, &payload.email)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or((StatusCode::UNAUTHORIZED, "Cuenta no encontrada".to_string()))?;
+
     sqlx::query("DELETE FROM verificaciones WHERE email = $1")
         .bind(&payload.email)
         .execute(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let token = create_token(&payload.usuario, &state.jwt_secret)
+    let token = create_token(&usuario_real, &state.jwt_secret)
         .map_err(|status| (status, "Error generando el token".to_string()))?;
 
     Ok(Json(VerifyResponse {
