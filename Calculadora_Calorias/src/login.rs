@@ -21,7 +21,6 @@ struct LoginResponse {
     success: bool,
     cuenta: String,
     correo: String,
-    token: Option<String>
 }
 
 #[derive(Serialize)]

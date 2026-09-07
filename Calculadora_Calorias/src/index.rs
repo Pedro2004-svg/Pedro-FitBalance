@@ -330,7 +330,7 @@ pub fn show(
                     });
 
                     if !_hay_cuenta.is_empty() && debe_registrar {
-                        let resultado =
+                        let _resultado =
                             runtime.block_on(tmb_register(_hay_cuenta.clone(), result.clone(), jwt_token.as_deref().unwrap_or(""),));
                     /* 
                         match resultado {

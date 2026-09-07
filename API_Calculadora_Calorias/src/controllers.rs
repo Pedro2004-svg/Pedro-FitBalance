@@ -90,7 +90,6 @@ pub struct TMBRequest {
 
 #[derive(Deserialize)]
 pub struct VerifyRequest {
-    pub usuario: String,
     pub email: String,
     pub codigo: i64,
 }
