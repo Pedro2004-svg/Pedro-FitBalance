@@ -224,7 +224,7 @@ pub async fn tmb(
     payload.usuario = claims.sub;
     let tmb_registrado: Result<bool, StatusCode> =
         tmb_register(&state.pool, &payload).await.map_err(|e| {
-            println!("ERROR SQLX: {:?}", e);
+            eprintln!("ERROR SQLX: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         });
     if tmb_registrado? {
@@ -246,12 +246,16 @@ pub async fn alimento_register(
     Json(mut payload): Json<Alimento>
 ) -> Result<Json<AlimentoResponse>, StatusCode> {
     payload.usuario = claims.sub;
-    let _alimento_registrado: Result<bool, StatusCode> = register_alimento(&state.pool, &payload).await.map_err(|e| {
-        println!("ERROR SQLX: {:?}", e);
+    let registrado = register_alimento(&state.pool, &payload).await.map_err(|e| {
+        eprintln!("ERROR SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
-    });
+    })?;
 
-    Ok(Json(AlimentoResponse { mensaje_alimento: "Alimento registrado correctamente".to_string() }))
+    if registrado {
+        Ok(Json(AlimentoResponse { mensaje_alimento: "Alimento registrado correctamente".to_string() }))
+    } else {
+        Err(StatusCode::BAD_REQUEST)
+    }
 }
 
 pub async fn get_alimentos(
@@ -259,9 +263,10 @@ pub async fn get_alimentos(
     claims: Claims
 ) -> Result<Json<Vec<AlimentoBBDD>>, StatusCode>{
     let alimento: Vec<AlimentoBBDD> = get_alimento(&state.pool, claims.sub).await.map_err(|e|{
-        println!("ERROR SQLX: {:?}", e);
+        eprintln!("ERROR SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
     Ok(Json(alimento))
 }
 
@@ -273,7 +278,7 @@ pub async fn delete_food(
     let id_alimento: i64 = payload.parse().map_err(|_| StatusCode::BAD_REQUEST)?;
 
     let borrado = delete_alimento(&state.pool, id_alimento, claims.sub).await.map_err(|e|{
-        println!("ERROR SQLX: {:?}",e);
+        eprintln!("ERROR SQLX: {:?}",e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -289,7 +294,7 @@ pub async fn obtener_tmb(
     claims: Claims
 ) -> Result<Json<String>, StatusCode>{
     let get_tmb: Result<String, StatusCode> = get_tmb(&state.pool, claims.sub).await.map_err(|e|{
-        println!("ERROR SQLX: {:?}", e);
+        eprintln!("ERROR SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     });
 
@@ -316,7 +321,7 @@ pub async fn upt_food(
     };
     
     upt_alim(&state.pool, &alimentos, claims.sub).await.map_err(|e|{
-        println!("ERROR SQLX: {:?}", e);
+        eprintln!("ERROR SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -337,7 +342,7 @@ pub async fn upt_usuario(
     }
 
     let upt_user: Result<String, StatusCode> = upt_user(&state.pool, &payload.usuario, claims.sub).await.map_err(|e|{
-        println!("Error SQLX: {:?}", e);
+        eprintln!("Error SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     });
 
@@ -379,7 +384,7 @@ pub async fn upt_correo(
     }
 
     let upt_email: Result<String, StatusCode> = upt_email(&state.pool, &payload.correo, claims.sub).await.map_err(|e|{
-        println!("Error SQLX: {:?}", e);
+        eprintln!("Error SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     });
 
@@ -419,12 +424,12 @@ pub async fn upt_passw(
 
     //Hashea la contraseña
     payload.contrasena_new = hashear_password(payload.contrasena_new).map_err(|e| {
-            println!("Error en el Hash: {:?}", e);
+            eprintln!("Error en el Hash: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
     let upt_pass: Result<String, StatusCode> = upt_pass(&state.pool, &payload.contrasena_new, claims.sub).await.map_err(|e|{
-        println!("Error SQLX: {:?}", e);
+        eprintln!("Error SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     });
 
@@ -461,7 +466,7 @@ pub async fn del_usuario(
     }
 
     let delete_user = del_user(&state.pool, claims.sub).await.map_err(|e|{
-        println!("Error SQLX: {:?}", e);
+        eprintln!("Error SQLX: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     });
 
@@ -471,7 +476,7 @@ pub async fn del_usuario(
         }
 
         Err(e) =>{
-            println!("{}", e.to_string());
+            eprintln!("{}", e.to_string());
             return Ok(Json(false))
         }
     }

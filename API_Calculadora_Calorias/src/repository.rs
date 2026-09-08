@@ -126,11 +126,18 @@ pub async fn register_alimento(
     pool: &PgPool,
     payload: &Alimento
 )-> Result<bool, sqlx::Error>{
-    let fecha = NaiveDate::parse_from_str(
-        &payload.fecha[..10],
-        "%Y-%m-%d"
-    ).unwrap();
-    let _registro = sqlx::query(
+    // `str::get` (a diferencia de indexar con []) nunca hace panic: devuelve
+    // None tanto si la cadena es más corta de 10 bytes como si el corte cae
+    // en medio de un carácter UTF-8 multibyte. Si la fecha no tiene un
+    // formato válido, no registramos nada (Ok(false)) en vez de tumbar el
+    // proceso con un panic.
+    let fecha_str = payload.fecha.get(..10).unwrap_or(payload.fecha.as_str());
+    let fecha = match NaiveDate::parse_from_str(fecha_str, "%Y-%m-%d") {
+        Ok(f) => f,
+        Err(_) => return Ok(false),
+    };
+
+    let resultado = sqlx::query(
         r#"
         INSERT INTO alimentos_usuario (created_at,id_usuario, calorias, nombre)
         Values ($1 ,(SELECT id FROM usuarios_registrados WHERE nombre_usuario = $2), $3, $4)
@@ -141,9 +148,9 @@ pub async fn register_alimento(
     .bind(&payload.calorias)
     .bind(&payload.nombre)
     .execute(pool)
-    .await;
+    .await?; // antes se ignoraba el error del INSERT y siempre se devolvía Ok(true)
 
-    Ok(true)
+    Ok(resultado.rows_affected() > 0)
 }
 
 pub async fn get_alimento(
@@ -218,7 +225,7 @@ pub async fn get_tmb(
 pub async fn upt_alim(
     pool: &PgPool,
     payload: &AlimentoBBDD,
-    usuario: String
+    usuario: String,
 ) -> Result<bool, sqlx::Error> {
 
     if !payload.nombre.is_empty(){
