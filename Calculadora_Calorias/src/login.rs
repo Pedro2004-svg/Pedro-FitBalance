@@ -209,7 +209,10 @@ async fn login_api(
     usuario: String,
     contrasena: String
 ) -> Result<LoginResponse, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .post("http://127.0.0.1:30000/login")
         .json(&LoginRequest {
@@ -236,7 +239,10 @@ async fn verify_cod(
     email: String,
     codigo: i64
 ) -> Result<VerifyResponse, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .post("http://127.0.0.1:30000/verify")
         .json(&VerifyRequest {

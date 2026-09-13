@@ -402,7 +402,10 @@ let alimento = Alimento {
     usuario,
     fecha
 };
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .post("http://127.0.0.1:30000/alimento_register")
         .header("Authorization", format!("Bearer {}", token))
@@ -426,7 +429,10 @@ async fn delete_food(
     id: i64,
     token: &str
 ) -> Result<String, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .delete("http://127.0.0.1:30000/delete-alimento")
         .header("Authorization", format!("Bearer {}", token))
@@ -457,7 +463,10 @@ async fn update_food(
         id
     };
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .put("http://127.0.0.1:30000/actualizar-alimento")
         .header("Authorization", format!("Bearer {}", token))

@@ -138,7 +138,10 @@ async fn create_user(
     correo: String,
     contrasena_confirm: String
 ) -> Result<RegisterResponse, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .post("http://127.0.0.1:30000/register")
         .json(&RegisterRequest {

@@ -433,7 +433,10 @@ fn main() -> eframe::Result<()> {
 pub async fn get_food(
     token: &str
 ) -> Result<Vec<AlimentoBBDD>, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .get("http://127.0.0.1:30000/get-alimento")
         .header("Authorization", format!("Bearer {}", token))

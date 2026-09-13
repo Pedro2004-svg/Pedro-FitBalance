@@ -389,7 +389,10 @@ fn calcular_tmb(
 }
 
 async fn tmb_register(usuario: String, calorias: String, token: &str) -> Result<String, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .post("http://127.0.0.1:30000/tmb_register")
         .header("Authorization", format!("Bearer {}", token))

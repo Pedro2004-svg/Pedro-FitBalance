@@ -588,7 +588,10 @@ async fn update_user(
     contrasena: String,
     token: &str
 ) -> Result<(String, Option<String>), String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .put("http://127.0.0.1:30000/cambio-usuario")
         .header("Authorization", format!("Bearer {}", token))
@@ -617,7 +620,10 @@ async fn update_email(
     contrasena: String,
     token: &str
 ) -> Result<String, String>{
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .put("http://127.0.0.1:30000/cambio-correo")
         .header("Authorization", format!("Bearer {}", token))
@@ -644,7 +650,10 @@ async fn update_pass(
     ant_contrasena: String, 
     token: &str
 ) -> Result<String, String>{
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .put("http://127.0.0.1:30000/cambio-contrasena")
         .header("Authorization", format!("Bearer {}", token))
@@ -670,7 +679,10 @@ async fn del_user(
     token: &str,
     contrasena: String
 ) -> Result<bool, String>{
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+    .timeout(std::time::Duration::from_secs(10))
+    .build()
+    .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
         .delete("http://127.0.0.1:30000/delete-usuario")
         .header("Authorization", format!("Bearer {}", token))

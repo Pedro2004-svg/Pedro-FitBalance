@@ -1,13 +1,14 @@
+use std::time::Duration;
+
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
 
 pub async fn connect(database_url: &str) -> Result<PgPool, sqlx::Error>{
-    PgPoolOptions::new()
-    .max_connections(10)
-    .connect(database_url)
-    .await?;
+    //Se crea la conexion a la BBDD, imprimiendo en consola un error si no conecta
 
     match PgPoolOptions::new()
+    .max_connections(10)
+    .acquire_timeout(Duration::from_secs(10))
     .connect(database_url)
     .await
     {

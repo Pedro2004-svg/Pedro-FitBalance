@@ -28,8 +28,26 @@ struct NutrientInfo {
 }
 
 pub async fn conexion_alimentos(pool: &PgPool) -> Result<Vec<FoodItem>, Box<dyn std::error::Error>> {
+    // Antes esto recorría TODO el JSON (varios miles de alimentos) haciendo
+    // una consulta SQL por cada uno, en CADA arranque del servidor, aunque
+    // ya estuvieran todos guardados de arranques anteriores. Con esta
+    // comprobación, si la tabla ya tiene datos, nos ahorramos todo ese
+    // trabajo y el arranque es prácticamente instantáneo.
+    let total_alimentos: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM alimentos")
+        .fetch_one(pool)
+        .await?;
+
+    if total_alimentos > 0 {
+        println!("La tabla de alimentos ya tiene {} filas, no se vuelve a poblar.", total_alimentos);
+        return Ok(Vec::new());
+    }
+
+    // Antes esto hacía .unwrap(): si el archivo no se encontraba (por
+    // ejemplo, al ejecutar el binario desde otra carpeta de trabajo, algo
+    // habitual al desplegar), el servidor entero hacía panic al arrancar.
+    // Con `?` el error se propaga de forma normal.
     let json =
-        fs::read_to_string("src/alimentos/FoodData_Central_foundation_food_json_2026-04-30.json").unwrap();
+        fs::read_to_string("src/alimentos/FoodData_Central_foundation_food_json_2026-04-30.json")?;
     let data: FoodData = serde_json::from_str(&json)?;
     let foods: Vec<FoodItem> = data.foods.into_iter().flatten().collect();
 
