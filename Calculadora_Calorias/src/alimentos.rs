@@ -132,26 +132,38 @@ pub fn show(
                         if ui.add(add_btn).clicked() {
                             if calorias.is_empty() || alimento_nombre.is_empty() {
                                 *error = "Introduce los parametros".to_string();
-                            }else{
-                                //Si hay cuenta se registra el alimento en la BBDD si no se introduce en el array
-                                if !hay_cuenta.is_empty() {
-                                    let _resultado = runtime.block_on(
-                                        register_food(calorias.parse::<i64>().unwrap(),alimento_nombre.to_string(), hay_cuenta.to_string(), fecha_hoy, jwt_token.as_deref().unwrap_or("")));
-                                    *controll = false;
-                                }else{
-                                    let alimento_introducido =
-                                        Alimento{
-                                            nombre: alimento_nombre.clone(),
-                                            calorias: calorias.parse::<i64>().unwrap(),
-                                            usuario: hay_cuenta.to_string(),
-                                            fecha: fecha_hoy.to_string() 
-                                        };
+                            } else {
+                                // Antes .unwrap() sobre el parseo hacía panic (y cerraba
+                                // toda la app) si el usuario escribía algo no numérico
+                                // en "Calorías". Ahora se valida antes y se muestra un
+                                // error normal.
+                                match calorias.parse::<i64>() {
+                                    Err(_) => {
+                                        *error = "Las calorías deben ser un número entero".to_string();
+                                    }
+                                    Ok(calorias_num) => {
+                                        //Si hay cuenta se registra el alimento en la BBDD si no se introduce en el array
+                                        if !hay_cuenta.is_empty() {
+                                            let _resultado = runtime.block_on(
+                                                register_food(calorias_num, alimento_nombre.to_string(), hay_cuenta.to_string(), fecha_hoy, jwt_token.as_deref().unwrap_or("")));
+                                            *controll = false;
+                                        } else {
+                                            let alimento_introducido =
+                                                Alimento{
+                                                    nombre: alimento_nombre.clone(),
+                                                    calorias: calorias_num,
+                                                    usuario: hay_cuenta.to_string(),
+                                                    fecha: fecha_hoy.to_string()
+                                                };
 
-                                    alimentos.push(AlimentoConId { alimento: alimento_introducido, id: 0, dia_dsemana: dia_semana.clone()});
+                                            alimentos.push(AlimentoConId { alimento: alimento_introducido, id: 0, dia_dsemana: dia_semana.clone()});
+                                        }
+                                        //Borra los campos del los inputs al presionar el boton de añadir alimento si todos los campos estan introducidos correctamente
+                                        *alimento_nombre = "".to_string();
+                                        *calorias = "".to_string();
+                                        *error = "".to_string();
+                                    }
                                 }
-                                //Borra los campos del los inputs al presionar el boton de añadir alimento si todos los campos estan introducidos correctamente
-                                *alimento_nombre = "".to_string();
-                                *calorias = "".to_string();
                             }
                         }
                         
@@ -241,24 +253,35 @@ pub fn show(
                                         .min_size(Vec2::new(20.0, 20.0));
 
                                         if ui.add(cnf_btn).clicked(){
-                                            for foods in alimentos.iter_mut() {
-                                                if foods.alimento.nombre == alimento.alimento.nombre{
-                                                    foods.alimento.nombre = editado.nombre_modificado.clone();
+                                            // Antes había dos .unwrap() separados sobre el
+                                            // mismo parseo: si el usuario escribía algo no
+                                            // numérico en "Calorías" al editar, la app
+                                            // entera hacía panic. Ahora se parsea una vez,
+                                            // se valida, y si falla se avisa sin cerrar la app.
+                                            match editado.calorias_modificado.parse::<i64>() {
+                                                Err(_) => {
+                                                    *error = "Las calorías deben ser un número entero".to_string();
                                                 }
+                                                Ok(calorias_num) => {
+                                                    for foods in alimentos.iter_mut() {
+                                                        if foods.alimento.nombre == alimento.alimento.nombre{
+                                                            foods.alimento.nombre = editado.nombre_modificado.clone();
+                                                        }
 
-                                                if foods.alimento.calorias == alimento.alimento.calorias{
-                                                    foods.alimento.calorias = editado.calorias_modificado.parse::<i64>().unwrap();
+                                                        if foods.alimento.calorias == alimento.alimento.calorias{
+                                                            foods.alimento.calorias = calorias_num;
+                                                        }
+                                                    }
+
+                                                    if !hay_cuenta.is_empty(){
+                                                        //Funcion API que actualiza la BBDD o el array de alimentos
+                                                        let _update = runtime.block_on(update_food(alimento.id, calorias_num, editado.nombre_modificado.clone(), jwt_token.as_deref().unwrap_or("")));
+                                                    }
+
+                                                    editado.editar = false;
+                                                    *error = "".to_string();
                                                 }
                                             }
-                                            
-                                            if !hay_cuenta.is_empty(){
-                                                //Funcion API que actualiza la BBDD o el array de alimentos
-                                                /* alimento.alimento.nombre = editado.nombre_modificado.clone();
-                                                alimento.alimento.calorias = editado.calorias_modificado.parse::<i64>().unwrap(); */
-                                                let _update = runtime.block_on(update_food(alimento.id, editado.calorias_modificado.parse::<i64>().unwrap(), editado.nombre_modificado.clone(), jwt_token.as_deref().unwrap_or("")));
-                                            }
-
-                                            editado.editar = false;
                                         }
 
                                         if ui.add(cnl_btn).clicked() {
@@ -370,7 +393,7 @@ async fn register_food(
     usuario: String,
     fecha_hoy: DateTime<Local>,
     token: &str
-) -> Result<AlimentoResponse, reqwest::Error> {
+) -> Result<AlimentoResponse, String> {
 
 let fecha = fecha_hoy.to_string();
 let alimento = Alimento {
@@ -385,36 +408,39 @@ let alimento = Alimento {
         .header("Authorization", format!("Bearer {}", token))
         .json(&alimento)
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
+        // Antes esto hacía panic!() y cerraba toda la app de escritorio ante
+        // cualquier error del backend (por ejemplo, un token JWT caducado).
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
-    let datos: AlimentoResponse = respuesta.json().await?;
+    let datos: AlimentoResponse = respuesta.json().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }
 
 async fn delete_food(
     id: i64,
     token: &str
-) -> Result<String, reqwest::Error> {
-    println!("Entro en el delete del front");
+) -> Result<String, String> {
     let client = reqwest::Client::new();
     let respuesta = client
         .delete("http://127.0.0.1:30000/delete-alimento")
         .header("Authorization", format!("Bearer {}", token))
         .body(id.to_string())
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
-    let datos: String = respuesta.json().await?;
+    let datos: String = respuesta.json().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }
 
@@ -423,7 +449,7 @@ async fn update_food(
     calorias: i64,
     nombre: String,
     token: &str
-) -> Result<AlimentoBBDD, reqwest::Error> {
+) -> Result<AlimentoBBDD, String> {
     
     let alimento = AlimentoUpt {
         nombre,
@@ -437,13 +463,14 @@ async fn update_food(
         .header("Authorization", format!("Bearer {}", token))
         .json(&alimento)
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
-    let datos: AlimentoBBDD = respuesta.json().await?;
+    let datos: AlimentoBBDD = respuesta.json().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }

@@ -137,7 +137,7 @@ async fn create_user(
     contrasena: String,
     correo: String,
     contrasena_confirm: String
-) -> Result<RegisterResponse, reqwest::Error> {
+) -> Result<RegisterResponse, String> {
     let client = reqwest::Client::new();
     let respuesta = client
         .post("http://127.0.0.1:30000/register")
@@ -148,14 +148,16 @@ async fn create_user(
             contrasena_confirm
         })
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
     if !respuesta.status().is_success() {
+        // Antes esto hacía panic!() y cerraba toda la app de escritorio ante
+        // cualquier error del backend.
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
     
-    let datos: RegisterResponse = respuesta.json().await?;
+    let datos: RegisterResponse = respuesta.json().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }

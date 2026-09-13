@@ -432,19 +432,20 @@ fn main() -> eframe::Result<()> {
 
 pub async fn get_food(
     token: &str
-) -> Result<Vec<AlimentoBBDD>, reqwest::Error> {
+) -> Result<Vec<AlimentoBBDD>, String> {
     let client = reqwest::Client::new();
     let respuesta = client
         .get("http://127.0.0.1:30000/get-alimento")
         .header("Authorization", format!("Bearer {}", token))
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
-    let datos: Vec<AlimentoBBDD> = respuesta.json().await?;
+    let datos: Vec<AlimentoBBDD> = respuesta.json().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }

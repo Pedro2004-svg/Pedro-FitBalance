@@ -140,23 +140,48 @@ pub fn show(
                             .corner_radius(CornerRadius::same(8))
                             .min_size(Vec2::new(32.0, 38.0));
                             if ui.add(btn).clicked(){
-                                let verificado = runtime.block_on(verify_cod(
-                                    usuario.clone(),
-                                    correo.clone(),
-                                    codigo.parse::<i64>().unwrap().clone()
-                                ));
-                                match verificado{
-                                    Ok(datos) => {
-                                        if datos.verificado{
-                                            *jwt_token = datos.token;
-                                        }
+                                // Antes .unwrap() sobre el parseo hacía panic (cerrando
+                                // toda la app) si el usuario escribía algo no numérico
+                                // en el código. Ahora se valida y se avisa sin crashear.
+                                match codigo.parse::<i64>() {
+                                    Err(_) => {
+                                        ui.ctx().data_mut(|d| {
+                                            d.insert_temp(egui::Id::new("login_codigo_invalido"), true)
+                                        });
                                     }
+                                    Ok(codigo_num) => {
+                                        ui.ctx().data_mut(|d| {
+                                            d.insert_temp(egui::Id::new("login_codigo_invalido"), false)
+                                        });
+                                        let verificado = runtime.block_on(verify_cod(
+                                            usuario.clone(),
+                                            correo.clone(),
+                                            codigo_num
+                                        ));
+                                        match verificado{
+                                            Ok(datos) => {
+                                                if datos.verificado{
+                                                    *jwt_token = datos.token;
+                                                }
+                                            }
 
-                                    Err(e) => {
-                                        println!("{}", e);
+                                            Err(e) => {
+                                                println!("{}", e);
+                                            }
+                                        }
                                     }
                                 }
                             };
+
+                            let codigo_invalido = ui.ctx().data_mut(|d| {
+                                *d.get_temp_mut_or_insert_with::<bool>(
+                                    egui::Id::new("login_codigo_invalido"),
+                                    || false,
+                                )
+                            });
+                            if codigo_invalido {
+                                ui.colored_label(egui::Color32::RED, "El código debe ser solo números");
+                            }
                         });
                     });
                     if !jwt_token.is_none(){
@@ -183,7 +208,7 @@ pub fn show(
 async fn login_api(
     usuario: String,
     contrasena: String
-) -> Result<LoginResponse, reqwest::Error> {
+) -> Result<LoginResponse, String> {
     let client = reqwest::Client::new();
     let respuesta = client
         .post("http://127.0.0.1:30000/login")
@@ -192,15 +217,17 @@ async fn login_api(
             contrasena
         })
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
+        // Antes esto hacía panic!() y cerraba toda la app de escritorio ante
+        // cualquier error del backend.
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
-    let datos: LoginResponse = respuesta.json().await?;
+    let datos: LoginResponse = respuesta.json().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }
 
@@ -208,7 +235,7 @@ async fn verify_cod(
     usuario: String,
     email: String,
     codigo: i64
-) -> Result<VerifyResponse, reqwest::Error> {
+) -> Result<VerifyResponse, String> {
     let client = reqwest::Client::new();
     let respuesta = client
         .post("http://127.0.0.1:30000/verify")
@@ -218,14 +245,14 @@ async fn verify_cod(
             codigo
         })
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
-    let datos: VerifyResponse = respuesta.json().await?;
+    let datos: VerifyResponse = respuesta.json().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }

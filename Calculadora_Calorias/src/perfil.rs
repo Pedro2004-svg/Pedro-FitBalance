@@ -587,7 +587,7 @@ async fn update_user(
     new_usuario: String,
     contrasena: String,
     token: &str
-) -> Result<(String, Option<String>), reqwest::Error> {
+) -> Result<(String, Option<String>), String> {
     let client = reqwest::Client::new();
     let respuesta = client
         .put("http://127.0.0.1:30000/cambio-usuario")
@@ -597,15 +597,18 @@ async fn update_user(
             contrasena
         })
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
+        // Antes esto hacía panic!() y cerraba toda la app de escritorio ante
+        // cualquier error del backend (incluido un JWT caducado).
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
 
-    let datos:(String, Option<String>) = respuesta.json().await?;
+    let datos:(String, Option<String>) = respuesta.json().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }
 
@@ -613,7 +616,7 @@ async fn update_email(
     new_correo: String,
     contrasena: String,
     token: &str
-) -> Result<String, reqwest::Error>{
+) -> Result<String, String>{
     let client = reqwest::Client::new();
     let respuesta = client
         .put("http://127.0.0.1:30000/cambio-correo")
@@ -623,15 +626,16 @@ async fn update_email(
             contrasena
         })
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
 
-    let datos:String = respuesta.text().await?;
+    let datos:String = respuesta.text().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }
 
@@ -639,7 +643,7 @@ async fn update_pass(
     new_contrasena: String,
     ant_contrasena: String, 
     token: &str
-) -> Result<String, reqwest::Error>{
+) -> Result<String, String>{
     let client = reqwest::Client::new();
     let respuesta = client
         .put("http://127.0.0.1:30000/cambio-contrasena")
@@ -649,36 +653,38 @@ async fn update_pass(
             contrasena_new: new_contrasena
         })
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
 
-    let datos:String = respuesta.text().await?;
+    let datos:String = respuesta.text().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }
 
 async fn del_user(
     token: &str,
     contrasena: String
-) -> Result<bool, reqwest::Error>{
+) -> Result<bool, String>{
     let client = reqwest::Client::new();
     let respuesta = client
         .delete("http://127.0.0.1:30000/delete-usuario")
         .header("Authorization", format!("Bearer {}", token))
         .body(contrasena)
         .send()
-        .await?;
+        .await
+        .map_err(|e| e.to_string())?;
 
     if !respuesta.status().is_success() {
         let status = respuesta.status();
-        let body = respuesta.text().await?;
-        panic!("Error backend: {} - {}", status, body);
+        let body = respuesta.text().await.unwrap_or_default();
+        return Err(format!("Error backend: {} - {}", status, body));
     }
 
-    let datos:bool = respuesta.json().await?;
+    let datos:bool = respuesta.json().await.map_err(|e| e.to_string())?;
     Ok(datos)
 }
