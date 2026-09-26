@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT contraseña, correo FROM usuarios_registrados WHERE nombre_usuario = ($1) ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "contraseña",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "correo",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "236132ae66f7809d863584326f7e6f455326b518eb727a1bdacce138bd10565d"
+}
