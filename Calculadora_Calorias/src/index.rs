@@ -394,7 +394,7 @@ async fn tmb_register(usuario: String, calorias: String, token: &str) -> Result<
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .post("http://127.0.0.1:30000/tmb_register")
+        .post("https://pedro-fit-balance.vercel.app/tmb_register")
         .header("Authorization", format!("Bearer {}", token))
         .json(&TMBRequest { usuario, calorias })
         .send()

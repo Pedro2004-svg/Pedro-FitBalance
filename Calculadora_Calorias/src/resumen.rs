@@ -401,7 +401,7 @@ pub async fn get_tmb(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-    .get("http://127.0.0.1:30000/get-tmb")
+    .get("https://pedro-fit-balance.vercel.app/get-tmb")
     .header("Authorization", format!("Bearer {}", token))
     .send()
     .await?;

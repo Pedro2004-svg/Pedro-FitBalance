@@ -438,7 +438,7 @@ pub async fn get_food(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .get("http://127.0.0.1:30000/get-alimento")
+        .get("https://pedro-fit-balance.vercel.app/get-alimento")
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await

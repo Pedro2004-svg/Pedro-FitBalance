@@ -143,7 +143,7 @@ async fn create_user(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .post("http://127.0.0.1:30000/register")
+        .post("https://pedro-fit-balance.vercel.app/register")
         .json(&RegisterRequest {
             usuario,
             contrasena,

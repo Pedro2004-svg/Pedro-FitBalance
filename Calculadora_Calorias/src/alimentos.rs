@@ -407,7 +407,7 @@ let alimento = Alimento {
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .post("http://127.0.0.1:30000/alimento_register")
+        .post("https://pedro-fit-balance.vercel.app/alimento_register")
         .header("Authorization", format!("Bearer {}", token))
         .json(&alimento)
         .send()
@@ -434,7 +434,7 @@ async fn delete_food(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .delete("http://127.0.0.1:30000/delete-alimento")
+        .delete("https://pedro-fit-balance.vercel.app/delete-alimento")
         .header("Authorization", format!("Bearer {}", token))
         .body(id.to_string())
         .send()
@@ -468,7 +468,7 @@ async fn update_food(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .put("http://127.0.0.1:30000/actualizar-alimento")
+        .put("https://pedro-fit-balance.vercel.app/actualizar-alimento")
         .header("Authorization", format!("Bearer {}", token))
         .json(&alimento)
         .send()

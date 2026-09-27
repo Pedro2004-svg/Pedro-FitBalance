@@ -255,7 +255,8 @@ fn modal_usuario(ui: &mut Ui, usuario: &mut String, contrasena :&mut String, usu
         egui::TextEdit::singleline(contrasena)
             .hint_text("Contraseña Actual")
             .desired_width(INFINITY)
-            .margin(egui::Margin::same(8)),
+            .margin(egui::Margin::same(8))
+            .password(true),
         );
         ui.add_space(4.0);
         ui.label("Necesaria para confirmar el cambio.");
@@ -351,7 +352,8 @@ fn modal_correo(ui: &mut Ui, correo: &mut String, contrasena :&mut String, usuar
         egui::TextEdit::singleline(contrasena)
             .hint_text("Contraseña Actual")
             .desired_width(INFINITY)
-            .margin(egui::Margin::same(8)),
+            .margin(egui::Margin::same(8))
+            .password(true),
         );
         ui.add_space(4.0);
         ui.label("Necesaria para confirmar el cambio.");
@@ -431,7 +433,8 @@ fn modal_contrasena(ui: &mut Ui, contrasena :&mut String, usuario_mod: &mut Stri
         egui::TextEdit::singleline(usuario_mod)
             .hint_text("Nueva contraseña")
             .desired_width(INFINITY)
-            .margin(egui::Margin::same(8)),
+            .margin(egui::Margin::same(8))
+            .password(true),
         );
         ui.add_space(10.0);
         ui.label("Confirmacion de la contraseña");
@@ -439,7 +442,8 @@ fn modal_contrasena(ui: &mut Ui, contrasena :&mut String, usuario_mod: &mut Stri
         egui::TextEdit::singleline(contrasena_confirm)
             .hint_text("Confirmacion contraseña")
             .desired_width(INFINITY)
-            .margin(egui::Margin::same(8)),
+            .margin(egui::Margin::same(8))
+            .password(true),
         );    
         ui.add_space(15.0);
         ui.horizontal(|ui|{
@@ -540,7 +544,8 @@ fn modal_eliminar(ui: &mut Ui, usuario: &mut String, contrasena :&mut String, mo
         egui::TextEdit::singleline(contrasena)
             .hint_text("*****")
             .desired_width(INFINITY)
-            .margin(egui::Margin::same(8)),
+            .margin(egui::Margin::same(8))
+            .password(true),
         );   
         ui.add_space(15.0);
         ui.horizontal(|ui|{
@@ -593,7 +598,7 @@ async fn update_user(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .put("http://127.0.0.1:30000/cambio-usuario")
+        .put("https://pedro-fit-balance.vercel.app/cambio-usuario")
         .header("Authorization", format!("Bearer {}", token))
         .json(&LoginRequest{
             usuario: new_usuario,
@@ -625,7 +630,7 @@ async fn update_email(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .put("http://127.0.0.1:30000/cambio-correo")
+        .put("https://pedro-fit-balance.vercel.app/cambio-correo")
         .header("Authorization", format!("Bearer {}", token))
         .json(&UptCorreo{
             correo: new_correo,
@@ -655,7 +660,7 @@ async fn update_pass(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .put("http://127.0.0.1:30000/cambio-contrasena")
+        .put("https://pedro-fit-balance.vercel.app/cambio-contrasena")
         .header("Authorization", format!("Bearer {}", token))
         .json(&UptPass{
             contrasena_ant: ant_contrasena,
@@ -684,7 +689,7 @@ async fn del_user(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .delete("http://127.0.0.1:30000/delete-usuario")
+        .delete("https://pedro-fit-balance.vercel.app/delete-usuario")
         .header("Authorization", format!("Bearer {}", token))
         .body(contrasena)
         .send()

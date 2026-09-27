@@ -117,6 +117,26 @@ pub fn show(
                 );
                 
                 if *success && tiempo_exito.is_none() {
+                    let overlay_response = egui::Area::new(egui::Id::new("modal_overlay"))
+                        .order(egui::Order::Middle)
+                        .fixed_pos(egui::Pos2::ZERO)
+                        .show(ui, |ui| {
+                            let screen_rect = ui.content_rect();
+                            ui.painter().rect_filled(
+                                screen_rect,
+                                0.0,
+                                egui::Color32::from_black_alpha(150),
+                            );
+                            ui.allocate_rect(screen_rect, egui::Sense::click())
+                        })
+                        .inner;
+
+                    if overlay_response.clicked(){
+                        *success = false;
+                        mensaje.clear();
+                        codigo.clear();
+                    }
+
                     egui::Window::new("Autentificacion 2FA")
                     .collapsible(false)
                     .resizable(false)
@@ -140,9 +160,6 @@ pub fn show(
                             .corner_radius(CornerRadius::same(8))
                             .min_size(Vec2::new(32.0, 38.0));
                             if ui.add(btn).clicked(){
-                                // Antes .unwrap() sobre el parseo hacía panic (cerrando
-                                // toda la app) si el usuario escribía algo no numérico
-                                // en el código. Ahora se valida y se avisa sin crashear.
                                 match codigo.parse::<i64>() {
                                     Err(_) => {
                                         ui.ctx().data_mut(|d| {
@@ -160,12 +177,18 @@ pub fn show(
                                         ));
                                         match verificado{
                                             Ok(datos) => {
+                                                ui.ctx().data_mut(|d| {
+                                                    d.insert_temp(egui::Id::new("login_codigo_mal_introducido"), false)
+                                                });
                                                 if datos.verificado{
                                                     *jwt_token = datos.token;
                                                 }
                                             }
 
                                             Err(e) => {
+                                            ui.ctx().data_mut(|d| {
+                                                d.insert_temp(egui::Id::new("login_codigo_mal_introducido"), true)
+                                            });
                                                 println!("{}", e);
                                             }
                                         }
@@ -182,6 +205,17 @@ pub fn show(
                             if codigo_invalido {
                                 ui.colored_label(egui::Color32::RED, "El código debe ser solo números");
                             }
+
+                            let codigo_malo = ui.ctx().data_mut(|d| {
+                                *d.get_temp_mut_or_insert_with::<bool>(
+                                    egui::Id::new("login_codigo_mal_introducido"),
+                                    || false,
+                                )
+                            });
+                            if codigo_malo {
+                                ui.colored_label(egui::Color32::RED, "Código incorrecto o expirado");
+                            }
+
                         });
                     });
                     if !jwt_token.is_none(){
@@ -214,7 +248,7 @@ async fn login_api(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .post("http://127.0.0.1:30000/login")
+        .post("https://pedro-fit-balance.vercel.app/login")
         .json(&LoginRequest {
             usuario,
             contrasena
@@ -244,7 +278,7 @@ async fn verify_cod(
     .build()
     .unwrap_or_else(|_| reqwest::Client::new());
     let respuesta = client
-        .post("http://127.0.0.1:30000/verify")
+        .post("https://pedro-fit-balance.vercel.app/verify")
         .json(&VerifyRequest {
             usuario,
             email,

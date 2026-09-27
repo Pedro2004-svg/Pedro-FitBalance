@@ -2,7 +2,7 @@ use crate::alimentos::AlimentoConId;
 use egui::{Ui,Color32, RichText};
 use crate::{egui, Pantalla};
 use crate::resumen::{card, get_tmb};
-use chrono::{Datelike, Local, NaiveDate, Duration, Weekday};
+use chrono::{Datelike, Local, NaiveDate, Duration, Weekday,};
 
 pub fn show(
     ui: &mut Ui, 
@@ -32,7 +32,7 @@ pub fn show(
         return; 
     }
 
-    let fecha_hoy = Local::now().date_naive();
+    let fecha_hoy: NaiveDate = Local::now().date_naive();
     let dia_semana = fecha_hoy.weekday().num_days_from_monday();
     let lunes = fecha_hoy - Duration::days(dia_semana as i64);
     let fechas_semana: Vec<NaiveDate> = (0..7).map(|i| lunes + Duration::days(i)).collect();
@@ -81,7 +81,9 @@ pub fn show(
                 };
 
                 card(ui,|ui|{
-                    let alimento_dia: Vec<_> = alimentos.iter().filter(|alimento| alimento.dia_dsemana == dia.to_string()).collect();
+                    let alimento_dia: Vec<_> = alimentos.iter().filter(|alimento| {
+                        //println!("{},{}", &alimento.alimento.fecha[0..10], fecha.to_string());
+                        &alimento.alimento.fecha[0..10] == fecha.to_string()}).collect();
                     let mut total_kcal: f64  = alimento_dia.iter().map(|a| a.alimento.calorias as f64).sum();
                     if total_kcal == -0.0{
                         total_kcal = 0.0;
