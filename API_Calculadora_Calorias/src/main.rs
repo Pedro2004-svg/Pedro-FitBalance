@@ -28,7 +28,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     conexion_alimentos(&pool).await?;
     let app = routes::routes(pool, Arc::new(jwt_secret));
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:30000").await?;
+    let port = std::env::var("PORT")
+    .unwrap_or_else(|_| "3000".to_string())
+    .parse::<u16>()
+    .expect("PORT debe ser un numero valido");
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    println!("Iniciando en el puerto: {}", port);
     axum::serve(listener, app).await?;
 
     Ok(())
