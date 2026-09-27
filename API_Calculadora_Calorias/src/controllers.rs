@@ -132,14 +132,11 @@ pub async fn login(
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
 
-        tokio::spawn({
-            let email = correo_cuenta.clone();
-            async move {
-                if let Err(e) = send_confirmation_email(&email, codigo).await {
-                    eprintln!("Error enviando email de confirmación: {e}"); // sigue funcionando igual
-                }
-            }
-        });
+        if let Err(e) = send_confirmation_email(&correo_cuenta, codigo).await {
+            eprintln!("Error enviando email de confirmación: {e}");
+            // Decide qué hacer aquí: ¿fallar la petición o responder igual?
+        }
+        
         Ok(Json(LoginResponse {
             mensaje: "Código de verificación enviado a tu email".to_string(),
             success: true,
